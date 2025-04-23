@@ -11,7 +11,7 @@ export interface WishlistItem {
     link: string | null;
     imageUrl: string | null;
     isReserved: boolean;
-    reservedBy: string | null; // ID пользователя, зарезервировавшего
+    reservedBy: string | null;
     isBought: boolean;
     createdAt: string;
     updatedAt: string;
@@ -27,55 +27,53 @@ interface Wishlist {
 }
 // --- /Типы данных ---
 
-// !!! Симулируем ID текущего пользователя (позже будет из Telegram) !!!
-const SIMULATED_USER_ID = 'user-self-123'; 
-// --------------------------------------------------------------------
+// --- Пропсы компонента ---
+interface WishlistDisplayProps {
+    chatId: string;         // Получаем реальный chatId
+    currentUserId: string;  // Получаем реальный userId (как строку)
+}
+// --- /Пропсы компонента ---
 
 
-const WishlistDisplay: React.FC = () => {
+const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId }) => { // Используем пропсы
     const [wishlist, setWishlist] = useState<Wishlist | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const currentChatId = 'test-chat-123'; // Жестко заданный ID чата
+    // Убрали currentChatId и SIMULATED_USER_ID - теперь они в пропсах
 
     // --- Получение данных ---
     useEffect(() => {
+        // Перезагружаем вишлист, если chatId изменился
+        if (!chatId) return; // Не делаем запрос, если chatId еще не пришел
+
         const fetchWishlist = async () => {
             setLoading(true);
             setError(null);
             try {
-                const response = await axios.post<Wishlist>('/api/wishlists', { chatId: currentChatId });
+                // Используем chatId из пропсов
+                const response = await axios.post<Wishlist>('/api/wishlists', { chatId: chatId });
                 setWishlist(response.data);
             } catch (err) {
-                console.error("Error fetching wishlist:", err);
-                setError('Failed to load wishlist.'); // Упрощенная ошибка
+                console.error("Error fetching wishlist for chat", chatId, ":", err);
+                // Можно добавить более специфичную обработку ошибок, если бэкенд возвращает 404
+                setError('Failed to load wishlist.');
                 setWishlist(null);
             } finally {
                 setLoading(false);
             }
         };
         fetchWishlist();
-    }, [currentChatId]);
+    }, [chatId]); // Зависимость от chatId
 
-    // --- Обработчики действий с элементом ---
-
-    // Общая функция для обновления элемента в state
+    // --- Обработчики ---
     const updateItemInState = (updatedItem: WishlistItem) => {
-        setWishlist(prev => {
-            if (!prev) return null;
-            return {
-                ...prev,
-                items: prev.items.map(item => item.id === updatedItem.id ? updatedItem : item)
-            };
-        });
+        setWishlist(prev => prev ? { ...prev, items: prev.items.map(item => item.id === updatedItem.id ? updatedItem : item) } : null);
     };
-    
-    // Обработчик добавления
+
     const handleAddItem = (newItem: WishlistItem) => {
         setWishlist(prev => prev ? { ...prev, items: [newItem, ...prev.items] } : null);
     };
 
-    // Обработчик удаления
     const handleDeleteItem = async (itemId: string, itemTitle: string) => {
         if (!window.confirm(`Delete "${itemTitle}"?`)) return;
         const originalWishlist = wishlist;
@@ -90,49 +88,42 @@ const WishlistDisplay: React.FC = () => {
         }
     };
 
-    // Обработчик резервирования
     const handleReserve = async (itemId: string) => {
         const item = wishlist?.items.find(i => i.id === itemId);
         if (!item) return;
-
         const originalWishlist = wishlist;
         setError(null);
-        
-        // Оптимистичное обновление
-        updateItemInState({ ...item, isReserved: true, reservedBy: SIMULATED_USER_ID });
-
+        // Используем currentUserId из пропсов
+        updateItemInState({ ...item, isReserved: true, reservedBy: currentUserId });
         try {
             const response = await axios.patch<WishlistItem>(`/api/wishlist-items/${itemId}`, {
                 isReserved: true,
-                reservedBy: SIMULATED_USER_ID 
+                reservedBy: currentUserId // Отправляем реальный ID пользователя
             });
-             updateItemInState(response.data); // Обновляем данными с сервера (на случай если там что-то изменилось еще)
+            updateItemInState(response.data);
         } catch (err) {
             console.error(`Error reserving item ${itemId}:`, err);
-            setWishlist(originalWishlist); // Откат
+            setWishlist(originalWishlist);
             setError(`Failed to reserve "${item.title}".`);
         }
     };
 
-    // Обработчик снятия резерва
     const handleUnreserve = async (itemId: string) => {
         const item = wishlist?.items.find(i => i.id === itemId);
         if (!item) return;
-
-         // Проверка: только тот, кто зарезервировал, может снять резерв
-         if (item.reservedBy !== SIMULATED_USER_ID) {
-            alert("You cannot unreserve an item reserved by someone else."); // Простое уведомление
+         // Используем currentUserId из пропсов для проверки
+         if (item.reservedBy !== currentUserId) {
+            // Можно использовать WebApp.showAlert() для нативного уведомления
+            alert("You can only unreserve items reserved by you."); 
             return;
          }
-
         const originalWishlist = wishlist;
         setError(null);
-        updateItemInState({ ...item, isReserved: false, reservedBy: null }); // Оптимистичное обновление
-
+        updateItemInState({ ...item, isReserved: false, reservedBy: null });
         try {
             const response = await axios.patch<WishlistItem>(`/api/wishlist-items/${itemId}`, {
                 isReserved: false,
-                reservedBy: null // Явно отправляем null
+                reservedBy: null
             });
             updateItemInState(response.data);
         } catch (err) {
@@ -141,23 +132,19 @@ const WishlistDisplay: React.FC = () => {
             setError(`Failed to unreserve "${item.title}".`);
         }
     };
-    
-    // Обработчик отметки "Куплено"
+
     const handleMarkAsBought = async (itemId: string) => {
         const item = wishlist?.items.find(i => i.id === itemId);
-         if (!item || item.isBought) return; // Не делаем ничего, если уже куплено
-
-        if (!window.confirm(`Mark "${item.title}" as bought? This cannot be easily undone.`)) return;
-        
+        if (!item || item.isBought) return;
+        // Можно использовать WebApp.showConfirm() для нативного подтверждения
+        if (!window.confirm(`Mark "${item.title}" as bought?`)) return;
         const originalWishlist = wishlist;
         setError(null);
-        // Оптимистичное обновление (также ставим isReserved=true, если еще не было)
-        updateItemInState({ ...item, isBought: true, isReserved: true }); 
-
+        updateItemInState({ ...item, isBought: true, isReserved: true }); // Отмечаем и резервируем
         try {
             const response = await axios.patch<WishlistItem>(`/api/wishlist-items/${itemId}`, {
                  isBought: true,
-                 isReserved: true // Можно отправлять isReserved тоже, если бэкенд это учитывает
+                 isReserved: true // Обновляем оба поля
             });
             updateItemInState(response.data);
         } catch (err) {
@@ -166,119 +153,101 @@ const WishlistDisplay: React.FC = () => {
             setError(`Failed to mark "${item.title}" as bought.`);
         }
     };
-
     // --- /Обработчики ---
-
 
     // --- Отображение ---
     if (loading) {
-        return <div className="p-4 text-center text-gray-500">Loading wishlist...</div>;
+        return <div className="p-4 text-center" style={{ color: 'var(--hint-color, #999999)' }}>Loading wishlist...</div>;
     }
     if (error && !wishlist) {
         return <div className="p-4 text-center text-red-500">{error}</div>;
     }
     if (!wishlist) {
-        return <div className="p-4 text-center text-gray-500">No wishlist data available.</div>;
+        // Если chatId есть, но вишлист не загрузился (например, 404 от бэкенда, но не ошибка сети)
+         return <div className="p-4 text-center" style={{ color: 'var(--hint-color, #999999)' }}>Wishlist not found or empty. Use the form to add items.</div>;
     }
 
     return (
-        <div className="p-4">
-            <h2 className="text-xl font-semibold mb-4">
-                Wishlist for Chat: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{wishlist.chatId}</span>
+        // Обертка теперь не нужна, т.к. стили применяются в App.tsx
+        <> 
+            {/* Заголовок с реальным chatId */}
+            <h2 className="text-xl font-semibold mb-4 px-4 pt-4"> 
+                Wishlist for Chat: <span className="font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-sm">{wishlist.chatId}</span>
             </h2>
 
             <AddItemForm wishlistId={wishlist.id} onItemAdded={handleAddItem} />
 
             {error && wishlist && (
-                 <div className="mt-4 p-2 text-sm text-red-700 bg-red-100 rounded-md">
+                 <div className="mt-4 mx-4 p-2 text-sm text-red-700 bg-red-100 rounded-md">
                      {error}
                  </div>
              )}
 
             {/* --- Список элементов --- */}
-            <div className="mt-6">
+            <div className="mt-6 px-4 pb-4">
                 <h3 className="text-lg font-medium mb-3">Items:</h3>
                 {wishlist.items.length === 0 ? (
-                    <p className="text-gray-600">This wishlist is empty...</p>
+                     <p className="text-sm" style={{ color: 'var(--hint-color, #999999)' }}>This wishlist is empty...</p>
                 ) : (
                     <ul className="space-y-3">
                         {wishlist.items.map((item) => {
-                             // Определяем, может ли текущий пользователь взаимодействовать с резервом
-                             const canInteractWithReserve = !item.isBought && (!item.isReserved || item.reservedBy === SIMULATED_USER_ID);
-                             const isReservedByCurrentUser = item.isReserved && item.reservedBy === SIMULATED_USER_ID;
+                             // Используем реальный currentUserId из пропсов
+                             const isReservedByCurrentUser = item.isReserved && item.reservedBy === currentUserId;
+                             const canInteractWithReserve = !item.isBought && (!item.isReserved || isReservedByCurrentUser);
 
                             return (
-                                <li key={item.id} className={`p-3 border rounded-md shadow-sm transition duration-150 ease-in-out hover:shadow-md ${item.isBought ? 'bg-green-50' : item.isReserved ? 'bg-yellow-50' : 'bg-white'}`}>
-                                    {/* ... (код отображения title, description, link, imageUrl - без изменений) ... */}
-                                    <div className="flex justify-between items-start">
+                                <li key={item.id} className={`p-3 border rounded-md shadow-sm transition duration-150 ease-in-out hover:shadow-md ${item.isBought ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700' : item.isReserved ? 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-700' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
+                                    {/* ... (отображение title, description, link, imageUrl) ... */}
+                                     <div className="flex justify-between items-start">
                                       <div>
                                           <h4 className="font-medium text-lg">{item.title}</h4>
-                                          {item.description && <p className="text-sm text-gray-600 mt-1">{item.description}</p>}
+                                          {item.description && <p className="text-sm mt-1" style={{ color: 'var(--second-text-color, #666)' }}>{item.description}</p>}
                                           {item.link && (
-                                              <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 text-sm mt-1 block truncate max-w-xs md:max-w-md">
+                                              <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-sm mt-1 block truncate max-w-xs md:max-w-md" style={{ color: 'var(--link-color, #2481cc)' }}>
                                                   {item.link}
                                               </a>
                                           )}
                                       </div>
                                        {item.imageUrl && (
-                                          <img src={item.imageUrl} alt={item.title} className="ml-4 w-16 h-16 object-cover rounded flex-shrink-0" />
+                                          <img src={item.imageUrl} alt={item.title} className="ml-4 w-16 h-16 object-cover rounded flex-shrink-0 border dark:border-gray-600" />
                                       )}
                                   </div>
 
-                                    {/* --- Статус и кнопки действий --- */}
-                                    <div className="mt-2 pt-2 border-t border-gray-100 flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs text-gray-500">
+                                    {/* --- Статус и кнопки --- */}
+                                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700/50 flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs" style={{ color: 'var(--hint-color, #999999)' }}>
                                         {/* Статус */}
-                                        <span className={`font-medium ${item.isBought ? 'text-green-700' : item.isReserved ? 'text-yellow-700' : 'text-gray-600'}`}>
-                                            Status: {item.isBought ? '🎁 Bought' : item.isReserved ? `🔒 Reserved ${item.reservedBy === SIMULATED_USER_ID ? '(by You)' : ''}` : '🟢 Available'}
-                                            {/* TODO: Позже можно добавить имя пользователя вместо ID, если оно будет доступно */}
+                                         <span className={`font-medium ${item.isBought ? 'text-green-700 dark:text-green-400' : item.isReserved ? 'text-yellow-700 dark:text-yellow-400' : ''}`}>
+                                            Status: {item.isBought ? '🎁 Bought' : item.isReserved ? `🔒 Reserved ${isReservedByCurrentUser ? '(by You)' : ''}` : '🟢 Available'}
                                         </span>
 
                                         {/* Кнопки */}
                                         <div className="mt-2 sm:mt-0 space-x-2 flex-shrink-0">
-                                             {/* Кнопка Reserve/Unreserve */}
-                                             {canInteractWithReserve && !item.isReserved && (
-                                                <button
-                                                    onClick={() => handleReserve(item.id)}
-                                                    className="px-2 py-1 text-xs text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50"
-                                                    title="Reserve this item"
-                                                >
+                                            {/* Кнопка Reserve/Unreserve */}
+                                            {canInteractWithReserve && !item.isReserved && (
+                                                <button onClick={() => handleReserve(item.id)} className="px-2 py-1 text-xs rounded focus:outline-none focus:ring-2 focus:ring-opacity-50 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 focus:ring-yellow-500" title="Reserve">
                                                     Reserve
                                                 </button>
                                             )}
-                                             {isReservedByCurrentUser && !item.isBought && (
-                                                <button
-                                                    onClick={() => handleUnreserve(item.id)}
-                                                    className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
-                                                    title="Cancel your reservation"
-                                                >
+                                            {isReservedByCurrentUser && !item.isBought && (
+                                                <button onClick={() => handleUnreserve(item.id)} className="px-2 py-1 text-xs rounded focus:outline-none focus:ring-2 focus:ring-opacity-50 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:ring-gray-500" title="Unreserve">
                                                     Unreserve
                                                 </button>
                                             )}
-
-                                            {/* Кнопка Mark as Bought (показываем, если не куплено) */}
-                                            {!item.isBought && (
-                                                <button
-                                                     onClick={() => handleMarkAsBought(item.id)}
-                                                     className="px-2 py-1 text-xs text-green-600 hover:text-green-800 hover:bg-green-100 rounded focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50"
-                                                     title="Mark this item as bought"
-                                                >
-                                                    Mark Bought
-                                                </button>
-                                            )}
-
-                                            {/* Кнопка Delete (показываем всегда, если не куплено? Или только для админа/создателя? Пока всегда) */}
+                                            {/* Кнопка Mark as Bought */}
                                              {!item.isBought && (
-                                                 <button
-                                                     onClick={() => handleDeleteItem(item.id, item.title)}
-                                                     className="px-2 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-100 rounded focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
-                                                     title="Delete this item"
-                                                 >
+                                                 <button onClick={() => handleMarkAsBought(item.id)} className="px-2 py-1 text-xs rounded focus:outline-none focus:ring-2 focus:ring-opacity-50 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 focus:ring-green-500" title="Mark Bought">
+                                                     Mark Bought
+                                                 </button>
+                                             )}
+                                             {/* Кнопка Delete */}
+                                             {!item.isBought && ( // Пока не даем удалять купленное
+                                                 <button onClick={() => handleDeleteItem(item.id, item.title)} className="px-2 py-1 text-xs rounded focus:outline-none focus:ring-2 focus:ring-opacity-50 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 focus:ring-red-500" title="Delete">
                                                      Delete
                                                  </button>
                                              )}
                                         </div>
                                     </div>
-                                    {/* --- /Статус и кнопки действий --- */}
+                                    {/* --- /Статус и кнопки --- */}
                                 </li>
                             )
                         })}
@@ -286,7 +255,7 @@ const WishlistDisplay: React.FC = () => {
                 )}
             </div>
              {/* --- /Список элементов --- */}
-        </div>
+        </> // Используем React Fragment вместо div
     );
 };
 

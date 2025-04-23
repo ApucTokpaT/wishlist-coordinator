@@ -1,0 +1,46 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+  // output = "../src/generated/prisma" // Убедитесь, что этой строки нет или она закомментирована
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Берет строку подключения из .env
+}
+
+// Модель для Вишлиста
+model Wishlist {
+  id        String   @id @default(cuid()) // Уникальный ID (строка, cuid - стандарт)
+  chatId    String   @unique             // ID чата в Telegram, к которому привязан список
+  createdAt DateTime @default(now())     // Дата создания
+  updatedAt DateTime @updatedAt         // Дата обновления
+
+  items WishlistItem[] // Связь "один ко многим" с элементами вишлиста
+}
+
+// Модель для Элемента Вишлиста
+model WishlistItem {
+  id          String   @id @default(cuid())
+  wishlistId  String                     // Внешний ключ для связи с Wishlist
+  title       String                     // Название желания
+  description String?                    // Описание (опционально - знак ?)
+  link        String?                    // Ссылка на товар (опционально)
+  imageUrl    String?                    // Ссылка на картинку (опционально)
+  isReserved  Boolean  @default(false)   // Зарезервирован ли подарок?
+  reservedBy  String?                    // Кем зарезервирован (например, user ID из Telegram, опционально)
+  isBought    Boolean  @default(false)   // Куплен ли подарок?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade) // Определение связи + каскадное удаление
+
+  @@index([wishlistId]) // Индекс по wishlistId для ускорения запросов
+}

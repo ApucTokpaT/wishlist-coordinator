@@ -1,0 +1,26 @@
+version: '3.8' # Указываем версию Docker Compose
+
+services:
+  # Сервис для базы данных PostgreSQL
+  postgres_db:
+    image: postgres:15-alpine # Используем официальный образ PostgreSQL 15 на Alpine Linux (легковесный)
+    container_name: wishlist_postgres # Имя контейнера для удобства
+    environment:
+      # Переменные окружения для настройки PostgreSQL
+      # ВАЖНО: Эти значения должны совпадать с тем, что вы указали в backend/.env файле (DATABASE_URL)!
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: wishlist_db
+    ports:
+      # Пробрасываем порт 5432 из контейнера на порт 5432 вашей машины (localhost)
+      # Формат: HOST:CONTAINER
+      - "5432:5432"
+    volumes:
+      # Создаем именованный том 'postgres_data' для хранения данных БД.
+      # Данные будут сохраняться даже после остановки/удаления контейнера.
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped # Автоматически перезапускать контейнер, если он остановился (кроме случая, когда его остановили вручную)
+
+volumes:
+  # Объявляем именованный том
+  postgres_data:

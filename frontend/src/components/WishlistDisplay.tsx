@@ -1,5 +1,5 @@
 // frontend/src/components/WishlistDisplay.tsx
-import React, { useState, useEffect } from 'react'; // Убрали React, он больше не нужен для импорта
+import React, { useState, useEffect } from 'react'; // Убрали React
 import axios from 'axios';
 import AddItemForm from './AddItemForm';
 
@@ -50,12 +50,18 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
     // --- Получение данных ---
      useEffect(() => {
         if (!chatId) return;
-        const fetchWishlist = async () => {
+        const fetchWishlist = async () => { 
              setLoading(true);
              setError(null);
              try {
                  const response = await axios.post<Wishlist>(`${API_BASE_URL}/api/wishlists`, { chatId: chatId });
-                 setWishlist(response.data);
+                 // Добавляем имена к загруженным данным, если резервировал текущий юзер
+                 const itemsWithNames = response.data.items.map(item => ({
+                     ...item,
+                     reservedByName: item.reservedBy === currentUserId ? currentUserName : null
+                 }));
+                 setWishlist({ ...response.data, items: itemsWithNames });
+
              } catch (err) {
                  console.error("Error fetching wishlist for chat", chatId, ":", err);
                  setError('Failed to load wishlist.');
@@ -65,7 +71,7 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
              }
          };
          fetchWishlist();
-     }, [chatId]);
+     }, [chatId, currentUserName, currentUserId]); // Добавили зависимости
 
     // --- Обработчики ---
     const updateItemInState = (updatedItem: WishlistItem) => {
@@ -78,87 +84,134 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
     };
 
     const handleAddItem = (newItem: WishlistItem) => { 
-         setWishlist(prev => prev ? { ...prev, items: [newItem, ...prev.items] } : null);
+         // Добавляем имя, если новый элемент как-то связан с текущим юзером (маловероятно при добавлении)
+         const newItemWithName = {
+             ...newItem,
+             reservedByName: newItem.reservedBy === currentUserId ? currentUserName : null
+         };
+         setWishlist(prev => prev ? { ...prev, items: [newItemWithName, ...prev.items] } : null);
     };
 
     const handleDeleteItem = async (itemId: string, itemTitle: string) => { 
-        if (!window.confirm(`Delete "${itemTitle}"?`)) return;
-        const originalWishlist = wishlist;
+        console.log(`[DeleteItem ${itemId}] Start`); // <-- ЛОГ 1
+        if (!window.confirm(`Delete "${itemTitle}"?`)) {
+            console.log(`[DeleteItem ${itemId}] Confirmation cancelled.`); // <-- ЛОГ 2
+            return;
+        }
+        const originalWishlist = wishlist ? JSON.parse(JSON.stringify(wishlist)) : null; // Глубокое копирование для отката
         setError(null);
+        
+        console.log(`[DeleteItem ${itemId}] Updating state optimistically...`); // <-- ЛОГ 3
         setWishlist(prev => prev ? { ...prev, items: prev.items.filter(item => item.id !== itemId) } : null);
+        
         try {
+            console.log(`[DeleteItem ${itemId}] Sending DELETE request...`); // <-- ЛОГ 4
             await axios.delete(`${API_BASE_URL}/api/wishlist-items/${itemId}`);
+            console.log(`[DeleteItem ${itemId}] DELETE request successful.`); // <-- ЛОГ 5
         } catch (err) {
-            console.error(`Error deleting item ${itemId}:`, err);
-            setWishlist(originalWishlist);
+            console.error(`[DeleteItem ${itemId}] Error deleting item:`, err); // <-- ЛОГ ОШИБКИ
+            setWishlist(originalWishlist); // Откат к сохраненному состоянию
             setError(`Failed to delete "${itemTitle}".`);
         }
+        console.log(`[DeleteItem ${itemId}] End`); // <-- ЛОГ 6
      };
 
     const handleReserve = async (itemId: string) => { 
-         const item = wishlist?.items.find(i => i.id === itemId);
-         if (!item) return;
-         const originalWishlist = wishlist;
-         setError(null);
-         updateItemInState({ ...item, isReserved: true, reservedBy: currentUserId, reservedByName: currentUserName });
-         try {
-             const response = await axios.patch<WishlistItem>(`${API_BASE_URL}/api/wishlist-items/${itemId}`, {
-                 isReserved: true,
-                 reservedBy: currentUserId 
-             });
-             updateItemInState({ ...response.data, reservedByName: response.data.reservedBy === currentUserId ? currentUserName : null });
-         } catch (err) {
-             console.error(`Error reserving item ${itemId}:`, err);
-             setWishlist(originalWishlist);
-             setError(`Failed to reserve "${item.title}".`);
-         }
+        console.log(`[ReserveItem ${itemId}] Start`);
+        const item = wishlist?.items.find(i => i.id === itemId);
+        if (!item) return;
+        const originalWishlist = wishlist ? JSON.parse(JSON.stringify(wishlist)) : null;
+        setError(null);
+        
+        console.log(`[ReserveItem ${itemId}] Updating state optimistically...`);
+        updateItemInState({ ...item, isReserved: true, reservedBy: currentUserId, reservedByName: currentUserName }); 
+        
+        try {
+            console.log(`[ReserveItem ${itemId}] Sending PATCH request...`);
+            const response = await axios.patch<WishlistItem>(`${API_BASE_URL}/api/wishlist-items/${itemId}`, {
+                isReserved: true,
+                reservedBy: currentUserId 
+            });
+            console.log(`[ReserveItem ${itemId}] PATCH successful. Updating state...`);
+            updateItemInState({ ...response.data, reservedByName: response.data.reservedBy === currentUserId ? currentUserName : null });
+            console.log(`[ReserveItem ${itemId}] State updated.`);
+        } catch (err) {
+            console.error(`[ReserveItem ${itemId}] Error reserving item:`, err);
+            setWishlist(originalWishlist);
+            setError(`Failed to reserve "${item.title}".`);
+        }
+        console.log(`[ReserveItem ${itemId}] End`);
      };
 
     const handleUnreserve = async (itemId: string) => { 
+        console.log(`[UnreserveItem ${itemId}] Start`);
         const item = wishlist?.items.find(i => i.id === itemId);
         if (!item) return;
          if (item.reservedBy !== currentUserId) {
              alert("You can only unreserve items reserved by you."); 
              return;
          }
-        const originalWishlist = wishlist;
+        const originalWishlist = wishlist ? JSON.parse(JSON.stringify(wishlist)) : null;
         setError(null);
+        
+        console.log(`[UnreserveItem ${itemId}] Updating state optimistically...`);
         updateItemInState({ ...item, isReserved: false, reservedBy: null, reservedByName: null });
+        
         try {
+             console.log(`[UnreserveItem ${itemId}] Sending PATCH request...`);
             const response = await axios.patch<WishlistItem>(`${API_BASE_URL}/api/wishlist-items/${itemId}`, {
                 isReserved: false,
                 reservedBy: null
             });
+            console.log(`[UnreserveItem ${itemId}] PATCH successful. Updating state...`);
             updateItemInState(response.data);
+            console.log(`[UnreserveItem ${itemId}] State updated.`);
         } catch (err) {
-            console.error(`Error unreserving item ${itemId}:`, err);
+            console.error(`[UnreserveItem ${itemId}] Error unreserving item:`, err);
             setWishlist(originalWishlist);
             setError(`Failed to unreserve "${item.title}".`);
         }
+         console.log(`[UnreserveItem ${itemId}] End`);
      };
 
     const handleMarkAsBought = async (itemId: string) => { 
+        console.log(`[MarkBought ${itemId}] Start`); // <-- ЛОГ 1
         const item = wishlist?.items.find(i => i.id === itemId);
-        if (!item || item.isBought) return;
-        if (!window.confirm(`Mark "${item.title}" as bought?`)) return;
-        const originalWishlist = wishlist;
+        if (!item || item.isBought) {
+             console.log(`[MarkBought ${itemId}] Already bought or item not found.`); // <-- ЛОГ 2
+             return;
+        }
+        if (!window.confirm(`Mark "${item.title}" as bought?`)) {
+             console.log(`[MarkBought ${itemId}] Confirmation cancelled.`); // <-- ЛОГ 3
+             return;
+        }
+        const originalWishlist = wishlist ? JSON.parse(JSON.stringify(wishlist)) : null; // Глубокое копирование для отката
         setError(null);
          const finalReservedById = item.isReserved ? (item.reservedBy ?? currentUserId) : currentUserId;
          const finalReservedByName = item.isReserved ? (item.reservedByName ?? currentUserName) : currentUserName;
 
+        console.log(`[MarkBought ${itemId}] Updating state optimistically...`); // <-- ЛОГ 4
         updateItemInState({ ...item, isBought: true, isReserved: true, reservedBy: finalReservedById, reservedByName: finalReservedByName }); 
+        
         try {
+            console.log(`[MarkBought ${itemId}] Sending PATCH request...`); // <-- ЛОГ 5
             const response = await axios.patch<WishlistItem>(`${API_BASE_URL}/api/wishlist-items/${itemId}`, {
                  isBought: true,
                  isReserved: true, 
                  reservedBy: finalReservedById 
             });
-             updateItemInState({ ...response.data, reservedByName: response.data.reservedBy === currentUserId ? currentUserName : null }); 
+             console.log(`[MarkBought ${itemId}] PATCH request successful. Updating state with server data...`); // <-- ЛОГ 6
+             // Убедимся, что имя текущего пользователя сохранилось, если он покупал/резервировал
+             const serverData = response.data;
+             const finalName = serverData.reservedBy === currentUserId ? currentUserName : null; // Имя только если текущий юзер = reservedBy
+             updateItemInState({ ...serverData, reservedByName: finalName }); 
+             console.log(`[MarkBought ${itemId}] State updated with server data.`); // <-- ЛОГ 7
         } catch (err) {
-            console.error(`Error marking item ${itemId} as bought:`, err);
-            setWishlist(originalWishlist);
+            console.error(`[MarkBought ${itemId}] Error marking item as bought:`, err); // <-- ЛОГ ОШИБКИ
+            setWishlist(originalWishlist); // Откат к сохраненному состоянию
             setError(`Failed to mark "${item.title}" as bought.`);
         }
+        console.log(`[MarkBought ${itemId}] End`); // <-- ЛОГ 8
     };
     // --- /Обработчики ---
 
@@ -183,14 +236,11 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
 
             <AddItemForm wishlistId={wishlist.id} onItemAdded={handleAddItem} />
 
-            {/* --- ИСПРАВЛЕННЫЙ БЛОК ОТОБРАЖЕНИЯ ОШИБКИ --- */}
              {error && wishlist && ( 
                  <div className="mt-4 mx-4 p-2 text-sm text-red-700 bg-red-100 rounded-md">
                      {error}
                  </div>
              )}
-             {/* ---------------------------------------------- */}
-
 
             <div className="mt-6 px-4 pb-4">
                 <h3 className="text-lg font-medium mb-3">Items:</h3>

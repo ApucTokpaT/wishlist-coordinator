@@ -1,5 +1,5 @@
 // frontend/src/components/WishlistDisplay.tsx
-import React, { useState, useEffect } from 'react'; // Убрали React
+import { useState, useEffect } from 'react'; // Убрали React
 import axios from 'axios';
 import AddItemForm from './AddItemForm';
 
@@ -55,13 +55,11 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
              setError(null);
              try {
                  const response = await axios.post<Wishlist>(`${API_BASE_URL}/api/wishlists`, { chatId: chatId });
-                 // Добавляем имена к загруженным данным, если резервировал текущий юзер
                  const itemsWithNames = response.data.items.map(item => ({
                      ...item,
                      reservedByName: item.reservedBy === currentUserId ? currentUserName : null
                  }));
                  setWishlist({ ...response.data, items: itemsWithNames });
-
              } catch (err) {
                  console.error("Error fetching wishlist for chat", chatId, ":", err);
                  setError('Failed to load wishlist.');
@@ -71,7 +69,7 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
              }
          };
          fetchWishlist();
-     }, [chatId, currentUserName, currentUserId]); // Добавили зависимости
+     }, [chatId, currentUserName, currentUserId]); 
 
     // --- Обработчики ---
     const updateItemInState = (updatedItem: WishlistItem) => {
@@ -84,40 +82,37 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
     };
 
     const handleAddItem = (newItem: WishlistItem) => { 
-         // Добавляем имя, если новый элемент как-то связан с текущим юзером (маловероятно при добавлении)
-         const newItemWithName = {
-             ...newItem,
-             reservedByName: newItem.reservedBy === currentUserId ? currentUserName : null
-         };
+         const newItemWithName = { ...newItem, reservedByName: newItem.reservedBy === currentUserId ? currentUserName : null };
          setWishlist(prev => prev ? { ...prev, items: [newItemWithName, ...prev.items] } : null);
     };
 
     const handleDeleteItem = async (itemId: string, itemTitle: string) => { 
-        console.log(`[DeleteItem ${itemId}] Start`); // <-- ЛОГ 1
+        // ЛОГ 1: Проверяем начало вызова
+        console.log(`[DeleteItem ${itemId}] Handler called.`); 
         if (!window.confirm(`Delete "${itemTitle}"?`)) {
-            console.log(`[DeleteItem ${itemId}] Confirmation cancelled.`); // <-- ЛОГ 2
+            console.log(`[DeleteItem ${itemId}] Confirmation cancelled.`); 
             return;
         }
-        const originalWishlist = wishlist ? JSON.parse(JSON.stringify(wishlist)) : null; // Глубокое копирование для отката
+        const originalWishlist = wishlist ? JSON.parse(JSON.stringify(wishlist)) : null;
         setError(null);
         
-        console.log(`[DeleteItem ${itemId}] Updating state optimistically...`); // <-- ЛОГ 3
+        console.log(`[DeleteItem ${itemId}] Updating state optimistically...`); 
         setWishlist(prev => prev ? { ...prev, items: prev.items.filter(item => item.id !== itemId) } : null);
         
         try {
-            console.log(`[DeleteItem ${itemId}] Sending DELETE request...`); // <-- ЛОГ 4
+            console.log(`[DeleteItem ${itemId}] Sending DELETE request...`); 
             await axios.delete(`${API_BASE_URL}/api/wishlist-items/${itemId}`);
-            console.log(`[DeleteItem ${itemId}] DELETE request successful.`); // <-- ЛОГ 5
+            console.log(`[DeleteItem ${itemId}] DELETE request successful.`); 
         } catch (err) {
-            console.error(`[DeleteItem ${itemId}] Error deleting item:`, err); // <-- ЛОГ ОШИБКИ
-            setWishlist(originalWishlist); // Откат к сохраненному состоянию
+            console.error(`[DeleteItem ${itemId}] Error deleting item:`, err); 
+            setWishlist(originalWishlist); 
             setError(`Failed to delete "${itemTitle}".`);
         }
-        console.log(`[DeleteItem ${itemId}] End`); // <-- ЛОГ 6
+        console.log(`[DeleteItem ${itemId}] Handler finished.`); 
      };
 
     const handleReserve = async (itemId: string) => { 
-        console.log(`[ReserveItem ${itemId}] Start`);
+        console.log(`[ReserveItem ${itemId}] Handler called.`);
         const item = wishlist?.items.find(i => i.id === itemId);
         if (!item) return;
         const originalWishlist = wishlist ? JSON.parse(JSON.stringify(wishlist)) : null;
@@ -140,11 +135,11 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
             setWishlist(originalWishlist);
             setError(`Failed to reserve "${item.title}".`);
         }
-        console.log(`[ReserveItem ${itemId}] End`);
+        console.log(`[ReserveItem ${itemId}] Handler finished.`);
      };
 
     const handleUnreserve = async (itemId: string) => { 
-        console.log(`[UnreserveItem ${itemId}] Start`);
+        console.log(`[UnreserveItem ${itemId}] Handler called.`);
         const item = wishlist?.items.find(i => i.id === itemId);
         if (!item) return;
          if (item.reservedBy !== currentUserId) {
@@ -171,21 +166,22 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
             setWishlist(originalWishlist);
             setError(`Failed to unreserve "${item.title}".`);
         }
-         console.log(`[UnreserveItem ${itemId}] End`);
+         console.log(`[UnreserveItem ${itemId}] Handler finished.`);
      };
 
     const handleMarkAsBought = async (itemId: string) => { 
-        console.log(`[MarkBought ${itemId}] Start`); // <-- ЛОГ 1
+        // ЛОГ 1: Проверяем начало вызова
+        console.log(`[MarkBought ${itemId}] Handler called.`); 
         const item = wishlist?.items.find(i => i.id === itemId);
         if (!item || item.isBought) {
-             console.log(`[MarkBought ${itemId}] Already bought or item not found.`); // <-- ЛОГ 2
+             console.log(`[MarkBought ${itemId}] Already bought or item not found.`); 
              return;
         }
         if (!window.confirm(`Mark "${item.title}" as bought?`)) {
-             console.log(`[MarkBought ${itemId}] Confirmation cancelled.`); // <-- ЛОГ 3
+             console.log(`[MarkBought ${itemId}] Confirmation cancelled.`); 
              return;
         }
-        const originalWishlist = wishlist ? JSON.parse(JSON.stringify(wishlist)) : null; // Глубокое копирование для отката
+        const originalWishlist = wishlist ? JSON.parse(JSON.stringify(wishlist)) : null; 
         setError(null);
          const finalReservedById = item.isReserved ? (item.reservedBy ?? currentUserId) : currentUserId;
          const finalReservedByName = item.isReserved ? (item.reservedByName ?? currentUserName) : currentUserName;
@@ -201,22 +197,25 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
                  reservedBy: finalReservedById 
             });
              console.log(`[MarkBought ${itemId}] PATCH request successful. Updating state with server data...`); // <-- ЛОГ 6
-             // Убедимся, что имя текущего пользователя сохранилось, если он покупал/резервировал
              const serverData = response.data;
-             const finalName = serverData.reservedBy === currentUserId ? currentUserName : null; // Имя только если текущий юзер = reservedBy
+             const finalName = serverData.reservedBy === currentUserId ? currentUserName : null; 
              updateItemInState({ ...serverData, reservedByName: finalName }); 
              console.log(`[MarkBought ${itemId}] State updated with server data.`); // <-- ЛОГ 7
         } catch (err) {
             console.error(`[MarkBought ${itemId}] Error marking item as bought:`, err); // <-- ЛОГ ОШИБКИ
-            setWishlist(originalWishlist); // Откат к сохраненному состоянию
+            setWishlist(originalWishlist); 
             setError(`Failed to mark "${item.title}" as bought.`);
         }
-        console.log(`[MarkBought ${itemId}] End`); // <-- ЛОГ 8
+        console.log(`[MarkBought ${itemId}] Handler finished.`); // <-- ЛОГ 8 (изменил на Handler finished)
     };
     // --- /Обработчики ---
 
 
     // --- Отображение ---
+    // ЛОГ: Проверяем значение isCurrentUserBirthdayPerson при каждом рендере
+    console.log(`[Render WishlistDisplay] isCurrentUserBirthdayPerson: ${isCurrentUserBirthdayPerson}, currentUserId: ${currentUserId}, birthdayPersonUserId: ${birthdayPersonUserId}`); 
+
+
     if (loading) { 
         return <div className="p-4 text-center" style={{ color: 'var(--hint-color, #999999)' }}>Loading wishlist...</div>;
      }

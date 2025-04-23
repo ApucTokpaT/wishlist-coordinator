@@ -1,16 +1,30 @@
 // backend/src/index.ts
 import express, { Request, Response } from 'express';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client'; 
+import cors from 'cors'; // <--- Импортируем CORS
 
 const app = express();
 const prisma = new PrismaClient();
-const PORT = process.env.PORT || 3001;
+// Render ИСПОЛЬЗУЕТ ПЕРЕМЕННУЮ ОКРУЖЕНИЯ PORT, или 10000 по умолчанию
+// Не устанавливайте здесь жестко 3001 для продакшена
+const PORT = process.env.PORT || 10000; 
 
 app.use(express.json());
 
+// --- НАСТРОЙКА CORS ---
+// Разрешаем запросы с URL фронтенда (из переменной окружения или дефолтного)
+// ЗАМЕНИТЕ URL по умолчанию на ваш URL с Netlify!
+const frontendUrl = process.env.FRONTEND_URL || 'https://helpful-belekoy-339fe6.netlify.app'; 
+console.log(`Allowing CORS for origin: ${frontendUrl}`); // Логируем для проверки
+app.use(cors({
+    origin: frontendUrl 
+}));
+// --------------------
+
+
 // --- Маршрут Health Check ---
 app.get('/api/health', async (req: Request, res: Response) => {
-    // console.log('GET /api/health'); // Можно добавить и сюда, если нужно
+    console.log('GET /api/health');
     try {
         await prisma.$queryRaw`SELECT 1`;
         res.json({ status: 'UP', timestamp: new Date().toISOString(), db_status: 'connected' });
@@ -20,18 +34,18 @@ app.get('/api/health', async (req: Request, res: Response) => {
     }
 });
 
+
 // --- Маршруты для Wishlist ---
 
 // Получить вишлисты
 app.get('/api/wishlists', async (req: Request, res: Response) => {
     const { chatId } = req.query;
-    console.log(`GET /api/wishlists (chatId: ${chatId || 'all'})`); // <--- ЛОГ
+    console.log(`GET /api/wishlists (chatId: ${chatId || 'all'})`);
     try {
-        // ... (логика без изменений) ...
-         if (chatId && typeof chatId === 'string') {
+        if (chatId && typeof chatId === 'string') {
             const wishlist = await prisma.wishlist.findUnique({
                 where: { chatId },
-                include: { items: { orderBy: { createdAt: 'desc' } } } 
+                include: { items: { orderBy: { createdAt: 'desc' } } }
             });
             if (wishlist) {
                 res.json(wishlist);
@@ -39,8 +53,8 @@ app.get('/api/wishlists', async (req: Request, res: Response) => {
                 res.status(404).json({ message: `Wishlist for chat ${chatId} not found` });
             }
         } else {
-            const wishlists = await prisma.wishlist.findMany({ 
-                include: { items: { orderBy: { createdAt: 'desc' } } } 
+            const wishlists = await prisma.wishlist.findMany({
+                include: { items: { orderBy: { createdAt: 'desc' } } }
             });
             res.json(wishlists);
         }
@@ -53,7 +67,7 @@ app.get('/api/wishlists', async (req: Request, res: Response) => {
 // Создать/получить вишлист
 app.post('/api/wishlists', async (req: Request, res: Response) => {
     const { chatId } = req.body;
-    console.log(`POST /api/wishlists (chatId: ${chatId})`); // <--- ЛОГ
+    console.log(`POST /api/wishlists (chatId: ${chatId})`);
     if (!chatId || typeof chatId !== 'string') {
         return res.status(400).json({ message: "chatId is required" });
     }
@@ -64,7 +78,7 @@ app.post('/api/wishlists', async (req: Request, res: Response) => {
             create: { chatId: chatId },
             include: { items: { orderBy: { createdAt: 'desc' } } }
         });
-         console.log(`Upserted wishlist for chatId: ${chatId}, ID: ${wishlist.id}`); // <--- ЛОГ УСПЕХА
+        console.log(`Upserted wishlist for chatId: ${chatId}, ID: ${wishlist.id}`);
         res.status(200).json(wishlist);
     } catch (error) {
         console.error("Error creating/finding wishlist:", error);
@@ -78,7 +92,7 @@ app.post('/api/wishlists', async (req: Request, res: Response) => {
 app.post('/api/wishlists/:wishlistId/items', async (req: Request, res: Response) => {
     const { wishlistId } = req.params;
     const { title, description, link, imageUrl } = req.body;
-    console.log(`POST /api/wishlists/${wishlistId}/items`); // <--- ЛОГ
+    console.log(`POST /api/wishlists/${wishlistId}/items`);
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
         return res.status(400).json({ message: "Item title required" });
@@ -97,7 +111,7 @@ app.post('/api/wishlists/:wishlistId/items', async (req: Request, res: Response)
                 wishlistId: wishlistId
             }
         });
-        console.log(`Added item ${newItem.id} to wishlist ${wishlistId}`); // <--- ЛОГ УСПЕХА
+        console.log(`Added item ${newItem.id} to wishlist ${wishlistId}`);
         res.status(201).json(newItem);
     } catch (error) {
         console.error("Error adding item:", error);
@@ -109,11 +123,10 @@ app.post('/api/wishlists/:wishlistId/items', async (req: Request, res: Response)
 app.patch('/api/wishlist-items/:itemId', async (req: Request, res: Response) => {
     const { itemId } = req.params;
     const { isReserved, reservedBy, isBought } = req.body;
-    console.log(`PATCH /api/wishlist-items/${itemId}`); // <--- ЛОГ
+    console.log(`PATCH /api/wishlist-items/${itemId}`);
 
     const dataToUpdate: Partial<Prisma.WishlistItemUpdateInput> = {};
-    // ... (валидация без изменений) ...
-     if (isReserved !== undefined) {
+    if (isReserved !== undefined) {
         if (typeof isReserved !== 'boolean') return res.status(400).json({ message: "isReserved must be a boolean" });
         dataToUpdate.isReserved = isReserved;
         if (isReserved === false) dataToUpdate.reservedBy = null;
@@ -123,7 +136,10 @@ app.patch('/api/wishlist-items/:itemId', async (req: Request, res: Response) => 
         dataToUpdate.isBought = isBought;
     }
     if (reservedBy !== undefined && dataToUpdate.isReserved !== false) {
-        if (typeof reservedBy !== 'string') return res.status(400).json({ message: "reservedBy must be string or null" });
+        // Разрешаем передавать null для сброса reservedBy, если нужно (хотя isReserved=false это уже делает)
+        if (reservedBy !== null && typeof reservedBy !== 'string') {
+             return res.status(400).json({ message: "reservedBy must be string or null" });
+        }
         dataToUpdate.reservedBy = reservedBy;
     }
 
@@ -136,7 +152,7 @@ app.patch('/api/wishlist-items/:itemId', async (req: Request, res: Response) => 
             where: { id: itemId },
             data: dataToUpdate
         });
-        console.log(`Updated item ${itemId}:`, dataToUpdate); // <--- ЛОГ УСПЕХА
+        console.log(`Updated item ${itemId}:`, dataToUpdate);
         res.json(updatedItem);
     } catch (error) {
          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
@@ -152,13 +168,13 @@ app.patch('/api/wishlist-items/:itemId', async (req: Request, res: Response) => 
 // Удалить элемент
 app.delete('/api/wishlist-items/:itemId', async (req: Request, res: Response) => {
     const { itemId } = req.params;
-    console.log(`DELETE /api/wishlist-items/${itemId}`); // <--- ЛОГ
+    console.log(`DELETE /api/wishlist-items/${itemId}`);
 
     try {
         await prisma.wishlistItem.delete({
             where: { id: itemId }
         });
-        console.log(`Deleted item ${itemId}`); // <--- ЛОГ УСПЕХА
+        console.log(`Deleted item ${itemId}`);
         res.status(204).send();
     } catch (error) {
          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
@@ -172,8 +188,9 @@ app.delete('/api/wishlist-items/:itemId', async (req: Request, res: Response) =>
 
 
 // --- Запуск сервера и обработка завершения ---
+// Используем переменную PORT от Render (или 10000 локально, если не задана)
 app.listen(PORT, () => {
-    console.log(`Backend server is running on http://localhost:${PORT}`);
+    console.log(`Backend server is running on port ${PORT}`);
 });
 
 const shutdown = async (signal: string) => {

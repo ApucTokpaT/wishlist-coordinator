@@ -1,7 +1,17 @@
+// frontend/tsconfig.json
 {
-  "files": [],
+  // --- ДОБАВЛЕНЫ ОПЦИИ ДЛЯ SHADCN ---
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  // ----------------------------------
+  "files": [], // Оставляем пустым, т.к. файлы указаны в references
   "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
+    // Ссылки на специфичные конфигурации
+    { "path": "./tsconfig.app.json" }, 
+    { "path": "./tsconfig.node.json" } 
   ]
 }

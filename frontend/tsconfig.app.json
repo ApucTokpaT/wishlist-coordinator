@@ -1,26 +1,35 @@
+// frontend/tsconfig.app.json
 {
   "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
+    "composite": true, // Важно для работы с references
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo", // Место для кэша сборки
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
+    /* Основные Настройки Компилятора */
+    "target": "ES2020", 
+    "lib": ["ES2020", "DOM", "DOM.Iterable"], 
+    "module": "ESNext", 
+    "jsx": "react-jsx", // Новый JSX transform
+    "skipLibCheck": true, 
+
+    /* Настройки Разрешения Модулей */
+    "moduleResolution": "bundler", 
     "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "react-jsx",
+    "noEmit": true, // TypeScript только проверяет типы
 
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    /* Строгость и Проверки */
+    "strict": true, 
+    "noUnusedLocals": true, 
+    "noUnusedParameters": true, 
+    "noFallthroughCasesInSwitch": true, 
+
+    /* Path Aliases - ДОБАВЛЕНО/ОСТАВЛЕНО */
+    "baseUrl": ".", 
+    "paths": {
+      "@/*": ["./src/*"] 
+    }
+    /* /Path Aliases */
   },
-  "include": ["src"]
+  "include": ["src"] // Включаем только папку src для этой конфигурации
 }

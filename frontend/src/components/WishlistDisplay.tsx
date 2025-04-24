@@ -57,12 +57,14 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
              setError(null);
              try {
                  const response = await axios.post<Wishlist>(`${API_BASE_URL}/api/wishlists`, { chatId: chatId });
+                 // Добавляем имена к загруженным данным, если резервировал текущий юзер
                  const itemsWithNames = response.data.items.map(item => ({
                      ...item,
-                     reservedByName: item.reservedBy === currentUserId ? currentUserName : null // Пытаемся установить имя сразу
+                     reservedByName: item.reservedBy === currentUserId ? currentUserName : null
                  }));
                  console.log("[Effect] Wishlist data received:", response.data);
                  setWishlist({ ...response.data, items: itemsWithNames });
+
              } catch (err) {
                  console.error("[Effect] Error fetching wishlist:", err);
                  let errorMsg = 'Failed to load wishlist.';
@@ -76,7 +78,7 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
              }
          };
          fetchWishlist();
-     }, [chatId, currentUserName, currentUserId]); // Зависим от всех пропсов
+     }, [chatId, currentUserName, currentUserId]); // Добавили зависимости
 
     // --- Обработчики ---
     const updateItemInState = (updatedItem: WishlistItem) => {
@@ -259,7 +261,7 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
     // Основной рендер, если вишлист есть
     return (
         <> 
-            <h2 className="text-xl font-semibold mb-4 px-4 pt-4"> 
+            <h2 className="text-xl font-semibold mb-4 px-4 pt-4 font-heading"> {/* Добавлен font-heading */}
                 Wishlist for Chat: <span className="font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-sm">{wishlist.chatId}</span>
                 {isCurrentUserBirthdayPerson && <span className="ml-2 text-sm font-normal text-yellow-500">(This is your list!)</span>}
             </h2>
@@ -271,14 +273,14 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
 
              {/* Отображаем ошибку действия (если она есть), но не ошибку загрузки */}
              {error && wishlist && error !== 'Failed to load wishlist.' && ( 
-                 <div className="mt-4 mx-4 p-2 text-sm text-red-700 bg-red-100 rounded-md">
+                 <div className="mt-4 mx-4 p-2 text-sm text-red-700 bg-red-100 dark:bg-red-900/30 rounded-md border border-red-200 dark:border-red-700">
                      {error}
                  </div>
              )}
 
 
             <div className="mt-6 px-4 pb-4">
-                <h3 className="text-lg font-medium mb-3">Items:</h3>
+                <h3 className="text-lg font-medium mb-3 font-heading">Items:</h3> {/* Добавлен font-heading */}
                 {wishlist.items.length === 0 ? ( 
                      <p className="text-sm" style={{ color: 'var(--hint-color, #999999)' }}>This wishlist is empty...</p>
                  ) : (
@@ -287,7 +289,6 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
                              const isReservedByCurrentUser = item.isReserved && item.reservedBy === currentUserId;
                              const canInteractWithReserve = !isCurrentUserBirthdayPerson && !item.isBought && (!item.isReserved || isReservedByCurrentUser);
                              const canMarkAsBought = !isCurrentUserBirthdayPerson && !item.isBought;
-                              // Удалять может не-именинник И если не куплено И (если зарезервировано - то только тот, кто резервировал)
                              const canDelete = !isCurrentUserBirthdayPerson && !item.isBought && (!item.isReserved || isReservedByCurrentUser);
 
                             return (
@@ -295,7 +296,8 @@ const WishlistDisplay: React.FC<WishlistDisplayProps> = ({ chatId, currentUserId
                                      {/* Блок отображения данных элемента */}
                                      <div className="flex justify-between items-start">
                                           <div>
-                                              <h4 className="font-medium text-lg">{item.title}</h4>
+                                              {/* Добавлен font-heading */}
+                                              <h4 className="font-medium text-lg font-heading">{item.title}</h4> 
                                               {item.description && <p className="text-sm mt-1" style={{ color: 'var(--second-text-color, #666)' }}>{item.description}</p>}
                                               {item.link && (
                                                   <a 

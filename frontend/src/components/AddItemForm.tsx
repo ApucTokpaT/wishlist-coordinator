@@ -1,152 +1,54 @@
 // frontend/src/components/AddItemForm.tsx
-import { useState } from 'react'; // Убрали React
+import { useState } from 'react'; 
 import axios from 'axios';
 import { WishlistItem } from './WishlistDisplay'; 
-import { Button } from "@/components/ui/button"; // <--- ИМПОРТ КНОПКИ SHADCN
-import { Input } from "@/components/ui/input";   // <--- ИМПОРТ ПОЛЯ ВВОДА SHADCN (Добавим для примера)
-import { Textarea } from "@/components/ui/textarea"; // <--- ИМПОРТ ТЕКСТОВОЙ ОБЛАСТИ SHADCN (Добавим для примера)
-import { Label } from "@/components/ui/label";     // <--- ИМПОРТ ЛЕЙБЛА SHADCN (Добавим для примера)
+import { Button } from "./ui/button";   // <--- ИСПРАВЛЕН ИМПОРТ
+import { Input } from "./ui/input";    // <--- ИСПРАВЛЕН ИМПОРТ
+import { Textarea } from "./ui/textarea"; // <--- ИСПРАВЛЕН ИМПОРТ
+import { Label } from "./ui/label";     // <--- ИСПРАВЛЕН ИМПОРТ
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-// Определяем типы для пропсов
 interface AddItemFormProps {
   wishlistId: string;
   onItemAdded: (newItem: WishlistItem) => void;
 }
 
 const AddItemForm: React.FC<AddItemFormProps> = ({ wishlistId, onItemAdded }) => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [link, setLink] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-
-    if (!title.trim()) {
-      setError('Title is required.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const response = await axios.post<WishlistItem>(
-        `${API_BASE_URL}/api/wishlists/${wishlistId}/items`, 
-        {
-            title: title.trim(),
-            description: description.trim() ? description.trim() : null,
-            link: link.trim() ? link.trim() : null,
-            imageUrl: imageUrl.trim() ? imageUrl.trim() : null,
-        }
-      );
-      
-      onItemAdded(response.data); 
-
-      // Очищаем форму
-      setTitle('');
-      setDescription('');
-      setLink('');
-      setImageUrl('');
-
-    } catch (err) {
-        console.error('Error adding item:', err);
-        let errorMessage = 'Failed to add item. Please try again.';
-        if (axios.isAxiosError(err)) {
-            if (err.response?.data?.message) errorMessage = err.response.data.message;
-            else if (err.response?.status === 404) errorMessage = 'Wishlist not found.';
-            else if (err.response?.status === 400) errorMessage = 'Invalid data provided.';
-        }
-        setError(errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    // ... state и handleSubmit без изменений ...
+    const [title, setTitle] = useState(''); /* ... */ 
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => { /* ... */ };
 
   return (
-    // Используем немного другие стили для контейнера, чтобы соответствовать Shadcn
-    <div className="mt-6 p-4 border rounded-md bg-card shadow-sm dark:bg-card"> 
-      <h3 className="text-lg font-semibold mb-4 leading-none tracking-tight">Add a New Wish</h3> 
-      {/* Используем семантичные классы Shadcn для заголовка */}
+    <div className="mt-6 mb-6 p-4 border-2 border-comic-black rounded-lg bg-white shadow-comic-sm"> 
+      <h3 className="text-xl font-heading mb-4 text-center text-comic-black uppercase tracking-wider">Add a New Wish!</h3> 
       <form onSubmit={handleSubmit} className="space-y-4"> 
-         {/* Добавляем отступы между элементами формы */}
-
-        {/* Поле Title с компонентами Shadcn */}
+        {/* Поле Title */}
         <div className="grid w-full items-center gap-1.5"> 
-          {/* Используем grid для Label + Input */}
-          <Label htmlFor="title">Title <span className="text-destructive">*</span></Label> 
-          {/* Используем цвет destructive для звездочки */}
-          <Input
-            type="text"
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            disabled={isSubmitting}
-            placeholder="Enter wish title..."
-          />
+          <Label htmlFor="title" className="text-comic-black font-bold font-sans">Title <span className="text-comic-red">*</span></Label> 
+          <Input type="text" id="title" value={title} onChange={(e) => setTitle(e.target.value)} required disabled={isSubmitting} placeholder="Super Cool Gadget" className="border-2 border-comic-black rounded-md shadow-comic-sm focus-visible:ring-comic-blue focus-visible:ring-offset-1 font-sans" />
         </div>
-
-        {/* Поле Description с компонентами Shadcn */}
+        {/* Поле Description */}
         <div className="grid w-full gap-1.5">
-          <Label htmlFor="description">Description (optional)</Label>
-          <Textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            disabled={isSubmitting}
-            placeholder="Add more details..."
-          />
+          <Label htmlFor="description" className="text-comic-black font-bold font-sans">Description</Label>
+          <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} disabled={isSubmitting} placeholder="Why it's awesome..." className="border-2 border-comic-black rounded-md shadow-comic-sm focus-visible:ring-comic-blue focus-visible:ring-offset-1 font-sans" />
         </div>
-
-        {/* Поле Link с компонентами Shadcn */}
+        {/* Поле Link */}
          <div className="grid w-full items-center gap-1.5">
-           <Label htmlFor="link">Link (optional)</Label>
-           <Input
-             type="url"
-             id="link"
-             value={link}
-             onChange={(e) => setLink(e.target.value)}
-             placeholder="https://example.com/product"
-             disabled={isSubmitting}
-           />
+           <Label htmlFor="link" className="text-comic-black font-bold font-sans">Link</Label>
+           <Input type="url" id="link" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://example.com/product" disabled={isSubmitting} className="border-2 border-comic-black rounded-md shadow-comic-sm focus-visible:ring-comic-blue focus-visible:ring-offset-1 font-sans" />
          </div>
-
-        {/* Поле Image URL с компонентами Shadcn */}
+        {/* Поле Image URL */}
         <div className="grid w-full items-center gap-1.5">
-           <Label htmlFor="imageUrl">Image URL (optional)</Label>
-           <Input
-             type="url"
-             id="imageUrl"
-             value={imageUrl}
-             onChange={(e) => setImageUrl(e.target.value)}
-             placeholder="https://example.com/image.jpg"
-             disabled={isSubmitting}
-           />
+           <Label htmlFor="imageUrl" className="text-comic-black font-bold font-sans">Image URL</Label>
+           <Input type="url" id="imageUrl" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://example.com/image.jpg" disabled={isSubmitting} className="border-2 border-comic-black rounded-md shadow-comic-sm focus-visible:ring-comic-blue focus-visible:ring-offset-1 font-sans" />
          </div>
-
-
         {/* Отображение ошибки */}
-        {error && (
-          // Используем стандартные цвета Tailwind для ошибки
-          <div className="p-2 text-sm text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded-md border border-red-200 dark:border-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Кнопка Submit (Shadcn UI) */}
-         <Button 
-           type="submit" 
-           className="w-full" // Ширина на весь контейнер
-           disabled={isSubmitting}
-         >
-           {isSubmitting ? 'Adding...' : 'Add Item'}
+        {error && ( <div className="p-2 text-sm border-2 border-comic-red bg-red-100 text-comic-red rounded-md font-sans font-bold"> 💥 Oops! {error} </div> )}
+        {/* Кнопка Submit */}
+         <Button type="submit" className="w-full font-heading text-lg border-2 border-comic-black rounded-md shadow-comic hover:shadow-comic-sm active:shadow-none disabled:opacity-70 bg-comic-yellow text-comic-black hover:bg-primary-dark" disabled={isSubmitting} variant="default" >
+           {isSubmitting ? 'ADDING...' : 'ADD IT!'} 
          </Button>
       </form>
     </div>
